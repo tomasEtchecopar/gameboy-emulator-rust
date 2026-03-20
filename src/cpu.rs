@@ -22,23 +22,31 @@ impl CPU {
             //NOP
             0x00 => {}
             // ADD
-            0x80 => {
-                let (resultado_a, hubo_carry) = self.registers.a.overflowing_add(self.registers.b);
-
-                //flags
-                self.registers.f.zero = resultado_a == 0;
-                self.registers.f.subtract = false;
-                self.registers.f.carry = hubo_carry;
-                self.registers.f.half_carry =
-                    (self.registers.a & 0x0F) + (self.registers.b & 0x0F) > 0x0F;
-
-                //a register
-                self.registers.a = resultado_a;
-            }
+            0x80 => self.add(self.registers.b),
+            0x81 => self.add(self.registers.c),
+            0x82 => self.add(self.registers.d),
+            0x83 => self.add(self.registers.e),
+            0x84 => self.add(self.registers.h),
+            0x85 => self.add(self.registers.l),
+            0x86 => self.add(self.memory_bus.read(self.registers.get_hl())),
+            0x87 => self.add(self.registers.a),
             _ => {
                 panic!("opcode no implementado: {:#04x}", opcode);
             }
         }
+    }
+
+    fn add(&mut self, value: u8) {
+        let (resultado_a, hubo_carry) = self.registers.a.overflowing_add(value);
+
+        //flags
+        self.registers.f.zero = resultado_a == 0;
+        self.registers.f.subtract = false;
+        self.registers.f.carry = hubo_carry;
+        self.registers.f.half_carry = (self.registers.a & 0x0F) + (value & 0x0F) > 0x0F;
+
+        //a register
+        self.registers.a = resultado_a;
     }
 }
 struct Registers {
