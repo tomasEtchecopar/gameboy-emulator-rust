@@ -1,10 +1,16 @@
 use std::fs;
 
+pub const MEMORY_BUS_SIZE: usize = 65536;
 pub struct MemoryBus {
-    memory: [u8; 65536],
+    pub memory: [u8; MEMORY_BUS_SIZE],
 }
 
 impl MemoryBus {
+    pub fn new() -> MemoryBus {
+        MemoryBus {
+            memory: [0; MEMORY_BUS_SIZE],
+        }
+    }
     pub fn read(&self, address: u16) -> u8 {
         self.memory[address as usize]
     }
@@ -13,7 +19,7 @@ impl MemoryBus {
         self.memory[adress as usize] = value;
     }
 
-    fn load_rom(&mut self, path: &str) {
+    pub fn load_rom(&mut self, path: &str) {
         let bytes = fs::read(path).unwrap();
         self.memory[..bytes.len()].copy_from_slice(&bytes);
     }

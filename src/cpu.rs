@@ -1,12 +1,18 @@
 use crate::memory::MemoryBus;
 
-struct CPU {
-    registers: Registers,
-    memory_bus: MemoryBus,
+pub struct CPU {
+    pub registers: Registers,
+    pub memory_bus: MemoryBus,
 }
 
 impl CPU {
-    fn step(&mut self) {
+    pub fn new() -> CPU {
+        CPU {
+            registers: Registers::new(),
+            memory_bus: MemoryBus::new(),
+        }
+    }
+    pub fn step(&mut self) {
         let op: u8 = self.fetch();
         self.decode_execute(op);
     }
@@ -20,6 +26,8 @@ impl CPU {
         match opcode {
             //NOP
             0x00 => {}
+            //INC
+            0x3C => self.registers.a = self.inc(self.registers.a),
             // ADD
             0x80 => self.add(self.registers.b),
             0x81 => self.add(self.registers.c),
@@ -32,7 +40,7 @@ impl CPU {
             0xC3 => {
                 let low_byte = self.fetch();
                 let high_byte = self.fetch();
-                self.registers.pc = (low_byte as u16) << 8 | high_byte as u16;
+                self.registers.pc = (high_byte as u16) << 8 | low_byte as u16;
             }
             _ => {
                 panic!("opcode no implementado: {:#04x}", opcode);
@@ -52,22 +60,50 @@ impl CPU {
         //a register
         self.registers.a = resultado_a;
     }
+
+    fn inc(&mut self, value: u8) -> u8 {
+        let resultado = value.wrapping_add(1);
+
+        self.registers.f.zero = resultado == 0;
+        self.registers.f.subtract = false;
+        self.registers.f.half_carry = (value & 0x0F) == 0x0F;
+
+        return resultado;
+    }
 }
 
 // 8-bit registers
-struct Registers {
-    a: u8,
-    b: u8,
-    c: u8,
-    d: u8,
-    e: u8,
-    f: FlagsRegister, //flags 1111 0000: 1- zero 1- Subtraction 1- Half Carry 1- Carry 0000
-    h: u8,
-    l: u8,
-    pc: u16,
+pub struct Registers {
+    pub a: u8,
+    pub b: u8,
+    pub c: u8,
+    pub d: u8,
+    pub e: u8,
+    pub f: FlagsRegister, //flags 1111 0000: 1- zero 1- Subtraction 1- Half Carry 1- Carry 0000
+    pub h: u8,
+    pub l: u8,
+    pub pc: u16,
 }
 
 impl Registers {
+    fn new() -> Registers {
+        Registers {
+            a: 0,
+            b: 0,
+            c: 0,
+            d: 0,
+            e: 0,
+            f: FlagsRegister {
+                zero: false,
+                subtract: false,
+                half_carry: false,
+                carry: false,
+            },
+            h: 0,
+            l: 0,
+            pc: 0,
+        }
+    }
     //get 16-bit virtual regs
     fn get_af(&self) -> u16 {
         (self.a as u16) << 8 | self.f.get_register() as u16 // bit manipulation
@@ -101,7 +137,7 @@ impl Registers {
     }
 }
 
-struct FlagsRegister {
+pub struct FlagsRegister {
     zero: bool,
     subtract: bool,
     half_carry: bool,

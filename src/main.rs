@@ -1,6 +1,14 @@
+use crate::cpu::CPU;
+
 mod cpu;
 mod memory;
 
 fn main() {
-    println!("Hello, world!");
+    let mut cpu = CPU::new();
+
+    cpu.memory_bus.load_rom("roms/cpu_instrs.gb");
+
+    loop {
+        cpu.step();
+    }
 }
