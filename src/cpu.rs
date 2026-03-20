@@ -1,6 +1,5 @@
 use crate::memory::MemoryBus;
 
-// 8-bit registers
 struct CPU {
     registers: Registers,
     memory_bus: MemoryBus,
@@ -30,6 +29,11 @@ impl CPU {
             0x85 => self.add(self.registers.l),
             0x86 => self.add(self.memory_bus.read(self.registers.get_hl())),
             0x87 => self.add(self.registers.a),
+            0xC3 => {
+                let low_byte = self.fetch();
+                let high_byte = self.fetch();
+                self.registers.pc = (low_byte as u16) << 8 | high_byte as u16;
+            }
             _ => {
                 panic!("opcode no implementado: {:#04x}", opcode);
             }
@@ -49,6 +53,8 @@ impl CPU {
         self.registers.a = resultado_a;
     }
 }
+
+// 8-bit registers
 struct Registers {
     a: u8,
     b: u8,
