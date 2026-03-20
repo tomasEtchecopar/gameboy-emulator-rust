@@ -1,4 +1,31 @@
+use crate::memory::MemoryBus;
+
 // 8-bit registers
+struct CPU {
+    registers: Registers,
+    memory_bus: MemoryBus,
+}
+
+impl CPU {
+    fn step(&mut self) {
+        let op: u8 = self.fetch();
+        self.decode_execute(op);
+    }
+    fn fetch(&mut self) -> u8 {
+        let instruction = self.memory_bus.read(self.registers.pc);
+        self.registers.pc += 1;
+        instruction
+    }
+
+    fn decode_execute(&mut self, opcode: u8) {
+        match opcode {
+            0x00 => {}
+            _ => {
+                panic!("opcode no implementado: {:#04x}", opcode);
+            }
+        }
+    }
+}
 struct Registers {
     a: u8,
     b: u8,
@@ -8,6 +35,7 @@ struct Registers {
     f: FlagsRegister, //flags 1111 0000: 1- zero 1- Subtraction 1- Half Carry 1- Carry 0000
     h: u8,
     l: u8,
+    pc: u16,
 }
 
 impl Registers {
