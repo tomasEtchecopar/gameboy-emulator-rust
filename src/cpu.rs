@@ -26,8 +26,20 @@ impl CPU {
         match opcode {
             //NOP
             0x00 => {}
+            //LD B, n8
+            0x06 => self.registers.b = self.fetch(),
+            //LD C, n8
+            0x0E => self.registers.c = self.fetch(),
+            //LD D, n8
+            0x16 => self.registers.d = self.fetch(),
+            //LD E, n8
+            0x1E => self.registers.e = self.fetch(),
+            //LD H, n8
+            0x26 => self.registers.h = self.fetch(),
             //DEC L
             0x2D => self.registers.l = self.dec(self.registers.l),
+            //LD L, n8
+            0x2E => self.registers.l = self.fetch(),
             //LD (HL-), A
             0x32 => {
                 self.memory_bus
@@ -35,8 +47,15 @@ impl CPU {
                 self.registers
                     .set_hl(self.registers.get_hl().wrapping_sub(1));
             }
+            //LD [HL], n8
+            0x36 => {
+                let data = self.fetch();
+                self.memory_bus.write(self.registers.get_hl(), data);
+            }
             //INC
             0x3C => self.registers.a = self.inc(self.registers.a),
+            //LD A, n8
+            0x3E => self.registers.a = self.fetch(),
             // ADD A
             0x80 => self.add(self.registers.b),
             0x81 => self.add(self.registers.c),
