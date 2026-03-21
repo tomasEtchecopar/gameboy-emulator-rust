@@ -56,6 +56,40 @@ impl CPU {
             0x3C => self.registers.a = self.inc(self.registers.a),
             //LD A, n8
             0x3E => self.registers.a = self.fetch(),
+            // LD r, r
+            0x40..=0x7f => {
+                // opcode: 01_xxx_yyy → xxx = destination, yyy = source
+                let src = match opcode & 0x07 {
+                    0 => self.registers.b,
+                    1 => self.registers.c,
+                    2 => self.registers.d,
+                    3 => self.registers.e,
+                    4 => self.registers.h,
+                    5 => self.registers.l,
+                    6 => self.memory_bus.read(self.registers.get_hl()), //memory[HL]
+                    7 => self.registers.a,
+                    _ => panic!("QUE PASO EN MATCH OPCODE AYUDA"),
+                };
+                let target_adress = (opcode >> 3) & 0x07;
+
+                if target_adress == 6 {
+                    //LD r, (HL)
+                    self.memory_bus.write(self.registers.get_hl(), src);
+                } else {
+                    let target = match target_adress {
+                        0 => &mut self.registers.b,
+                        1 => &mut self.registers.c,
+                        2 => &mut self.registers.d,
+                        3 => &mut self.registers.e,
+                        4 => &mut self.registers.h,
+                        5 => &mut self.registers.l,
+                        7 => &mut self.registers.a,
+                        _ => panic!("QUE PASO EN MATCH OPCODE AYUDA"),
+                    };
+
+                    *target = src;
+                }
+            }
             // ADD A
             0x80 => self.add(self.registers.b),
             0x81 => self.add(self.registers.c),
