@@ -120,6 +120,21 @@ impl CPU {
                 self.registers.pc = (high_byte as u16) << 8 | low_byte as u16;
                 self.registers.sp = self.registers.sp.wrapping_add(1);
             }
+            0xCD => {
+                //operand
+                let low_byte = self.fetch();
+                let high_byte = self.fetch();
+                //saving return adress to stack
+                let high_byte_ret = (self.registers.pc >> 8) as u8;
+                let low_byte_ret = (self.registers.pc) as u8;
+                self.memory_bus.write(self.registers.sp, high_byte_ret);
+                self.registers.sp = self.registers.sp.wrapping_sub(1);
+                self.memory_bus.write(self.registers.sp, low_byte_ret);
+                self.registers.sp = self.registers.sp.wrapping_sub(1);
+
+                //jump to operand
+                self.registers.pc = (high_byte as u16) << 8 | low_byte as u16;
+            }
             _ => {
                 panic!(
                     "opcode no implementado: {:#04x} en PC: {:#06x}",
