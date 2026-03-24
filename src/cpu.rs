@@ -91,14 +91,14 @@ impl CPU {
                 }
             }
             // ADD A
-            0x80 => self.add(self.registers.b),
-            0x81 => self.add(self.registers.c),
-            0x82 => self.add(self.registers.d),
-            0x83 => self.add(self.registers.e),
-            0x84 => self.add(self.registers.h),
-            0x85 => self.add(self.registers.l),
-            0x86 => self.add(self.memory_bus.read(self.registers.get_hl())),
-            0x87 => self.add(self.registers.a),
+            0x80 => self.add_to_a(self.registers.b),
+            0x81 => self.add_to_a(self.registers.c),
+            0x82 => self.add_to_a(self.registers.d),
+            0x83 => self.add_to_a(self.registers.e),
+            0x84 => self.add_to_a(self.registers.h),
+            0x85 => self.add_to_a(self.registers.l),
+            0x86 => self.add_to_a(self.memory_bus.read(self.registers.get_hl())),
+            0x87 => self.add_to_a(self.registers.a),
             //SBC A
             0x9A => self.registers.a = self.sbc(self.registers.d),
             0x9E => self.registers.a = self.sbc(self.memory_bus.read(self.registers.get_hl())),
@@ -112,28 +112,57 @@ impl CPU {
                 let high_byte = self.fetch();
                 self.registers.pc = (high_byte as u16) << 8 | low_byte as u16;
             }
+            //POP BC
+            0xC1 => {
+                let address = self.stack_pop();
+                self.registers.set_bc(address);
+            }
+            //PUSH BC
+            0xC5 => {
+                self.stack_push(self.registers.get_bc());
+            }
             //RET
             0xC9 => {
-                let low_byte = self.memory_bus.read(self.registers.sp);
-                self.registers.sp = self.registers.sp.wrapping_add(1);
-                let high_byte = self.memory_bus.read(self.registers.sp);
-                self.registers.pc = (high_byte as u16) << 8 | low_byte as u16;
-                self.registers.sp = self.registers.sp.wrapping_add(1);
+                let address = self.stack_pop();
+                self.registers.pc = address;
             }
+            //CALL
             0xCD => {
                 //operand
                 let low_byte = self.fetch();
                 let high_byte = self.fetch();
                 //saving return adress to stack
-                let high_byte_ret = (self.registers.pc >> 8) as u8;
-                let low_byte_ret = (self.registers.pc) as u8;
-                self.memory_bus.write(self.registers.sp, high_byte_ret);
-                self.registers.sp = self.registers.sp.wrapping_sub(1);
-                self.memory_bus.write(self.registers.sp, low_byte_ret);
-                self.registers.sp = self.registers.sp.wrapping_sub(1);
+                self.stack_push(self.registers.pc);
 
                 //jump to operand
                 self.registers.pc = (high_byte as u16) << 8 | low_byte as u16;
+            }
+            //POP DE
+            0xD1 => {
+                let address = self.stack_pop();
+                self.registers.set_de(address);
+            }
+            //PUSH DE
+            0xD5 => {
+                self.stack_push(self.registers.get_de());
+            }
+            //POP HL
+            0xE1 => {
+                let address = self.stack_pop();
+                self.registers.set_hl(address);
+            }
+            //PUSH HL
+            0xE5 => {
+                self.stack_push(self.registers.get_hl());
+            }
+            //POP AF
+            0xF1 => {
+                let address = self.stack_pop();
+                self.registers.set_af(address);
+            }
+            //PUSH AF
+            0xF5 => {
+                self.stack_push(self.registers.get_af());
             }
             _ => {
                 panic!(
@@ -144,7 +173,7 @@ impl CPU {
         }
     }
 
-    fn add(&mut self, value: u8) {
+    fn add_to_a(&mut self, value: u8) {
         let (result_a, hubo_carry) = self.registers.a.overflowing_add(value);
 
         //flags
@@ -164,7 +193,7 @@ impl CPU {
         self.registers.f.subtract = false;
         self.registers.f.half_carry = (value & 0x0F) == 0x0F;
 
-        return result;
+        result
     }
 
     fn dec(&mut self, value: u8) -> u8 {
@@ -174,7 +203,7 @@ impl CPU {
         self.registers.f.subtract = true;
         self.registers.f.half_carry = (value & 0x0F) == 0x00;
 
-        return result;
+        result
     }
     fn or(&mut self, value: u8) -> u8 {
         let result = (self.registers.a) | (value);
@@ -184,7 +213,7 @@ impl CPU {
         self.registers.f.carry = false;
         self.registers.f.half_carry = false;
 
-        return result;
+        result
     }
 
     fn sbc(&mut self, value: u8) -> u8 {
@@ -197,7 +226,27 @@ impl CPU {
             (self.registers.a & 0x0F) < (value & 0x0F) + self.registers.f.carry as u8;
         self.registers.f.carry = carry1 || carry2;
 
-        return result2;
+        result2
+    }
+
+    fn stack_push(&mut self, value: u16) {
+        let high_byte = (value >> 8) as u8;
+        self.registers.sp = self.registers.sp.wrapping_sub(1);
+        self.memory_bus.write(self.registers.sp, high_byte);
+        let low_byte = value as u8;
+        self.registers.sp = self.registers.sp.wrapping_sub(1);
+        self.memory_bus.write(self.registers.sp, low_byte);
+    }
+
+    fn stack_pop(&mut self) -> u16 {
+        let low_byte = self.memory_bus.read(self.registers.sp);
+        self.registers.sp = self.registers.sp.wrapping_add(1);
+        let high_byte = self.memory_bus.read(self.registers.sp);
+        self.registers.sp = self.registers.sp.wrapping_add(1);
+
+        let adress = (high_byte as u16) << 8 | low_byte as u16;
+
+        adress
     }
 }
 
