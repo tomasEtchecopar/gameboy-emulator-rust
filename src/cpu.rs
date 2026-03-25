@@ -22,6 +22,12 @@ impl CPU {
         instruction
     }
 
+    fn fetch_u16(&mut self) -> u16 {
+        let low_byte = self.fetch();
+        let high_byte = self.fetch();
+        (high_byte as u16) << 8 | low_byte as u16
+    }
+
     fn decode_execute(&mut self, opcode: u8) {
         match opcode {
             //NOP
@@ -34,12 +40,33 @@ impl CPU {
             0x16 => self.registers.d = self.fetch(),
             //LD E, n8
             0x1E => self.registers.e = self.fetch(),
+            //JR nz, i8
+            0x20 => {
+                let offset = self.fetch() as i8;
+                if !self.registers.f.zero {
+                    self.registers.pc = self.registers.pc.wrapping_add_signed(offset as i16);
+                }
+            }
             //LD H, n8
             0x26 => self.registers.h = self.fetch(),
+            //JR Z, i8
+            0x28 => {
+                let offset = self.fetch() as i8;
+                if self.registers.f.zero {
+                    self.registers.pc = self.registers.pc.wrapping_add_signed(offset as i16);
+                }
+            }
             //DEC L
             0x2D => self.registers.l = self.dec(self.registers.l),
             //LD L, n8
             0x2E => self.registers.l = self.fetch(),
+            //JR NC, i8
+            0x30 => {
+                let offset = self.fetch() as i8;
+                if !self.registers.f.carry {
+                    self.registers.pc = self.registers.pc.wrapping_add_signed(offset as i16);
+                }
+            }
             //LD (HL-), A
             0x32 => {
                 self.memory_bus
@@ -52,10 +79,18 @@ impl CPU {
                 let data = self.fetch();
                 self.memory_bus.write(self.registers.get_hl(), data);
             }
+            //JR C, i8
+            0x38 => {
+                let offset = self.fetch() as i8;
+                if self.registers.f.carry {
+                    self.registers.pc = self.registers.pc.wrapping_add_signed(offset as i16);
+                }
+            }
             //INC
             0x3C => self.registers.a = self.inc(self.registers.a),
             //LD A, n8
             0x3E => self.registers.a = self.fetch(),
+            0x76 => { /* TODO: HALT*/ }
             // LD r, r
             0x40..=0x7f => {
                 // opcode: 01_xxx_yyy → xxx = destination, yyy = source
@@ -106,11 +141,17 @@ impl CPU {
             0xB3 => {
                 self.registers.a = self.or(self.registers.e);
             }
+            //JP NZ, n16
+            0xC2 => {
+                let address = self.fetch_u16();
+                if !self.registers.f.zero {
+                    self.registers.pc = address;
+                }
+            }
             //JUMP
             0xC3 => {
-                let low_byte = self.fetch();
-                let high_byte = self.fetch();
-                self.registers.pc = (high_byte as u16) << 8 | low_byte as u16;
+                let address = self.fetch_u16();
+                self.registers.pc = address;
             }
             //POP BC
             0xC1 => {
@@ -126,25 +167,46 @@ impl CPU {
                 let address = self.stack_pop();
                 self.registers.pc = address;
             }
+            //JP Z, n16
+            0xCA => {
+                let address = self.fetch_u16();
+                if self.registers.f.zero {
+                    self.registers.pc = address;
+                }
+            }
             //CALL
             0xCD => {
                 //operand
-                let low_byte = self.fetch();
-                let high_byte = self.fetch();
+                let address = self.fetch_u16();
+
                 //saving return adress to stack
                 self.stack_push(self.registers.pc);
 
                 //jump to operand
-                self.registers.pc = (high_byte as u16) << 8 | low_byte as u16;
+                self.registers.pc = address;
             }
             //POP DE
             0xD1 => {
                 let address = self.stack_pop();
                 self.registers.set_de(address);
             }
+            //JP NC, n16
+            0xD2 => {
+                let address = self.fetch_u16();
+                if !self.registers.f.carry {
+                    self.registers.pc = address;
+                }
+            }
             //PUSH DE
             0xD5 => {
                 self.stack_push(self.registers.get_de());
+            }
+            //JP C, n16
+            0xDA => {
+                let address = self.fetch_u16();
+                if self.registers.f.carry {
+                    self.registers.pc = address;
+                }
             }
             //POP HL
             0xE1 => {
