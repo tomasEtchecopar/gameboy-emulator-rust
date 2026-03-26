@@ -253,11 +253,35 @@ impl CPU {
             //SBC A
             0x9A => self.registers.a = self.sbc(self.registers.d),
             0x9E => self.registers.a = self.sbc(self.memory_bus.read(self.registers.get_hl())),
-            //OR A, C
-            0xB1 => self.registers.a = self.a_or(self.registers.c),
-            //OR A, E
-            0xB3 => {
-                self.registers.a = self.a_or(self.registers.e);
+            //AND, XOR, OR, CMP
+            0xA0..=0xBF => {
+                // opcode: 01_xxx_yyy → xxx = operaction, yyy = source
+                let src = match opcode & 0x07 {
+                    //operand changes every opecode, repeats after 7
+                    0 => self.registers.b,
+                    1 => self.registers.c,
+                    2 => self.registers.d,
+                    3 => self.registers.e,
+                    4 => self.registers.h,
+                    5 => self.registers.l,
+                    6 => self.memory_bus.read(self.registers.get_hl()), //memory[HL]
+                    7 => self.registers.a,
+                    _ => panic!("QUE PASO EN MATCH OPCODE AYUDA"),
+                };
+
+                let result: u8 = match opcode {
+                    //operation changes every 7 opcodes
+                    0xA0..=0xA7 => self.a_and(src),
+                    0xA8..=0xAF => self.a_xor(src),
+                    0xB0..=0xB7 => self.a_or(src),
+                    0xB8..=0xBF => {
+                        self.compare(self.registers.a, src);
+                        self.registers.a
+                    }
+                    _ => panic!("wrong opcode"),
+                };
+
+                self.registers.a = result;
             }
             //JP NZ, n16
             0xC2 => {
@@ -432,7 +456,7 @@ impl CPU {
         self.registers.f.zero = result == 0;
         self.registers.f.subtract = true;
         self.registers.f.carry = carry;
-        self.registers.f.half_carry = (value & 0x0F) < (result & 0x0F);
+        self.registers.f.half_carry = (value & 0x0F) < (operand & 0x0F);
     }
 
     fn a_or(&mut self, value: u8) -> u8 {
@@ -453,6 +477,17 @@ impl CPU {
         self.registers.f.subtract = false;
         self.registers.f.carry = false;
         self.registers.f.half_carry = true;
+
+        result
+    }
+
+    fn a_xor(&mut self, value: u8) -> u8 {
+        let result = (self.registers.a) ^ (value);
+
+        self.registers.f.zero = result == 0;
+        self.registers.f.subtract = false;
+        self.registers.f.carry = false;
+        self.registers.f.half_carry = false;
 
         result
     }
