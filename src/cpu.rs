@@ -45,10 +45,14 @@ impl CPU {
             }
             //INC B
             0x04 => self.registers.b = self.inc(self.registers.b),
+            //DEC B
+            0x05 => self.registers.b = self.dec(self.registers.b),
             //LD B, n8
             0x06 => self.registers.b = self.fetch(),
             //INC C
             0x0C => self.registers.c = self.inc(self.registers.c),
+            //DEC C
+            0x0D => self.registers.c = self.dec(self.registers.c),
             //LD C, n8
             0x0E => self.registers.c = self.fetch(),
             //LD DE, n16
@@ -58,6 +62,8 @@ impl CPU {
             }
             //INC D
             0x14 => self.registers.d = self.inc(self.registers.d),
+            //DEC D
+            0x15 => self.registers.d = self.dec(self.registers.d),
             //LD D, n8
             0x16 => self.registers.d = self.fetch(),
             //JR i8
@@ -67,6 +73,8 @@ impl CPU {
             }
             //INC E
             0x1C => self.registers.e = self.inc(self.registers.e),
+            //DEC E
+            0x1D => self.registers.e = self.dec(self.registers.e),
             //LD E, n8
             0x1E => self.registers.e = self.fetch(),
             //JR nz, i8
@@ -88,6 +96,8 @@ impl CPU {
             }
             //INC H
             0x24 => self.registers.h = self.inc(self.registers.h),
+            //DEC H
+            0x25 => self.registers.h = self.dec(self.registers.h),
             //LD H, n8
             0x26 => self.registers.h = self.fetch(),
             //JR Z, i8
@@ -133,6 +143,14 @@ impl CPU {
                 self.memory_bus
                     .write(self.registers.get_hl(), incremented_value);
             }
+            //DEC (HL)
+            0x35 => {
+                let original_value = self.memory_bus.read(self.registers.get_hl());
+                let decreased_value = self.dec(original_value);
+
+                self.memory_bus
+                    .write(self.registers.get_hl(), decreased_value);
+            }
             //LD [HL], n8
             0x36 => {
                 let data = self.fetch();
@@ -147,6 +165,8 @@ impl CPU {
             }
             //INC A
             0x3C => self.registers.a = self.inc(self.registers.a),
+            //DEC A
+            0x3D => self.registers.a = self.dec(self.registers.a),
             //LD A, n8
             0x3E => self.registers.a = self.fetch(),
             0x76 => { /* TODO: HALT*/ }
