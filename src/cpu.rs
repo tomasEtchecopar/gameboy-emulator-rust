@@ -49,6 +49,12 @@ impl CPU {
             0x05 => self.registers.b = self.dec(self.registers.b),
             //LD B, n8
             0x06 => self.registers.b = self.fetch(),
+            //DEC BC
+            0x0B => {
+                let value = self.dec_u16(self.registers.get_bc());
+
+                self.registers.set_bc(value);
+            }
             //INC C
             0x0C => self.registers.c = self.inc(self.registers.c),
             //DEC C
@@ -58,6 +64,12 @@ impl CPU {
             //LD DE, n16
             0x11 => {
                 let value = self.fetch_u16();
+                self.registers.set_de(value);
+            }
+            //INC DE
+            0x13 => {
+                let value = self.inc_u16(self.registers.get_de());
+
                 self.registers.set_de(value);
             }
             //INC D
@@ -70,6 +82,12 @@ impl CPU {
             0x18 => {
                 let offset = self.fetch() as i16;
                 self.registers.pc = self.registers.pc.wrapping_add_signed(offset as i16);
+            }
+            //DEC DE
+            0x1B => {
+                let value = self.dec_u16(self.registers.get_de());
+
+                self.registers.set_de(value);
             }
             //INC E
             0x1C => self.registers.e = self.inc(self.registers.e),
@@ -113,6 +131,12 @@ impl CPU {
                 self.registers
                     .set_hl(self.registers.get_hl().wrapping_add(1));
             }
+            //DEC HL
+            0x2B => {
+                let value = self.dec_u16(self.registers.get_hl());
+
+                self.registers.set_hl(value);
+            }
             //INC L
             0x2C => self.registers.l = self.inc(self.registers.l),
             //DEC L
@@ -134,6 +158,12 @@ impl CPU {
                     .write(self.registers.get_hl(), self.registers.a);
                 self.registers
                     .set_hl(self.registers.get_hl().wrapping_sub(1));
+            }
+            //INC SP
+            0x33 => {
+                let value = self.inc_u16(self.registers.sp);
+
+                self.registers.sp = value;
             }
             //INC (HL)
             0x34 => {
@@ -162,6 +192,12 @@ impl CPU {
                 if self.registers.f.carry {
                     self.registers.pc = self.registers.pc.wrapping_add_signed(offset as i16);
                 }
+            }
+            //DEC SP
+            0x3B => {
+                let value = self.dec_u16(self.registers.sp);
+
+                self.registers.sp = value;
             }
             //INC A
             0x3C => self.registers.a = self.inc(self.registers.a),
@@ -384,6 +420,10 @@ impl CPU {
         self.registers.f.half_carry = (value & 0x0F) == 0x00;
 
         result
+    }
+
+    fn dec_u16(&mut self, value: u16) -> u16 {
+        value.wrapping_sub(1)
     }
 
     fn compare(&mut self, value: u8, operand: u8) {
