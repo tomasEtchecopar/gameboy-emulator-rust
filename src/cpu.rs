@@ -43,19 +43,32 @@ impl CPU {
                 let value = self.inc_u16(self.registers.get_bc());
                 self.registers.set_bc(value);
             }
+            //INC B
+            0x04 => self.registers.b = self.inc(self.registers.b),
             //LD B, n8
             0x06 => self.registers.b = self.fetch(),
+            //INC C
+            0x0C => self.registers.c = self.inc(self.registers.c),
             //LD C, n8
             0x0E => self.registers.c = self.fetch(),
+            //LD DE, n16
+            0x11 => {
+                let value = self.fetch_u16();
+                self.registers.set_de(value);
+            }
+            //INC D
+            0x14 => self.registers.d = self.inc(self.registers.d),
             //LD D, n8
             0x16 => self.registers.d = self.fetch(),
-            //LD E, n8
-            0x1E => self.registers.e = self.fetch(),
             //JR i8
             0x18 => {
                 let offset = self.fetch() as i16;
                 self.registers.pc = self.registers.pc.wrapping_add_signed(offset as i16);
             }
+            //INC E
+            0x1C => self.registers.e = self.inc(self.registers.e),
+            //LD E, n8
+            0x1E => self.registers.e = self.fetch(),
             //JR nz, i8
             0x20 => {
                 let offset = self.fetch() as i8;
@@ -63,16 +76,18 @@ impl CPU {
                     self.registers.pc = self.registers.pc.wrapping_add_signed(offset as i16);
                 }
             }
-            //INC HL
-            0x23 => {
-                let value = self.inc_u16(self.registers.get_hl());
-                self.registers.set_hl(value);
-            }
             //LD HL, n16
             0x21 => {
                 let value = self.fetch_u16();
                 self.registers.set_hl(value);
             }
+            //INC HL
+            0x23 => {
+                let value = self.inc_u16(self.registers.get_hl());
+                self.registers.set_hl(value);
+            }
+            //INC H
+            0x24 => self.registers.h = self.inc(self.registers.h),
             //LD H, n8
             0x26 => self.registers.h = self.fetch(),
             //JR Z, i8
@@ -88,6 +103,8 @@ impl CPU {
                 self.registers
                     .set_hl(self.registers.get_hl().wrapping_add(1));
             }
+            //INC L
+            0x2C => self.registers.l = self.inc(self.registers.l),
             //DEC L
             0x2D => self.registers.l = self.dec(self.registers.l),
             //LD L, n8
@@ -107,6 +124,14 @@ impl CPU {
                     .write(self.registers.get_hl(), self.registers.a);
                 self.registers
                     .set_hl(self.registers.get_hl().wrapping_sub(1));
+            }
+            //INC (HL)
+            0x34 => {
+                let original_value = self.memory_bus.read(self.registers.get_hl());
+                let incremented_value = self.inc(original_value);
+
+                self.memory_bus
+                    .write(self.registers.get_hl(), incremented_value);
             }
             //LD [HL], n8
             0x36 => {
@@ -139,6 +164,7 @@ impl CPU {
                     7 => self.registers.a,
                     _ => panic!("QUE PASO EN MATCH OPCODE AYUDA"),
                 };
+
                 let target_adress = (opcode >> 3) & 0x07;
 
                 if target_adress == 6 {
@@ -172,10 +198,10 @@ impl CPU {
             0x9A => self.registers.a = self.sbc(self.registers.d),
             0x9E => self.registers.a = self.sbc(self.memory_bus.read(self.registers.get_hl())),
             //OR A, C
-            0xB1 => self.registers.a = self.or(self.registers.c),
+            0xB1 => self.registers.a = self.a_or(self.registers.c),
             //OR A, E
             0xB3 => {
-                self.registers.a = self.or(self.registers.e);
+                self.registers.a = self.a_or(self.registers.e);
             }
             //JP NZ, n16
             0xC2 => {
@@ -258,6 +284,11 @@ impl CPU {
             //PUSH HL
             0xE5 => {
                 self.stack_push(self.registers.get_hl());
+            }
+            //AND A, n8
+            0xE6 => {
+                let value = self.fetch();
+                self.registers.a = self.a_and(value);
             }
             //LD (n16), A
             0xEA => {
@@ -343,13 +374,25 @@ impl CPU {
         self.registers.f.carry = carry;
         self.registers.f.half_carry = (value & 0x0F) < (result & 0x0F);
     }
-    fn or(&mut self, value: u8) -> u8 {
+
+    fn a_or(&mut self, value: u8) -> u8 {
         let result = (self.registers.a) | (value);
 
         self.registers.f.zero = result == 0;
         self.registers.f.subtract = false;
         self.registers.f.carry = false;
         self.registers.f.half_carry = false;
+
+        result
+    }
+
+    fn a_and(&mut self, value: u8) -> u8 {
+        let result = (self.registers.a) & (value);
+
+        self.registers.f.zero = result == 0;
+        self.registers.f.subtract = false;
+        self.registers.f.carry = false;
+        self.registers.f.half_carry = true;
 
         result
     }
