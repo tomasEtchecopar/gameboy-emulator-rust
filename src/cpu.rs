@@ -206,7 +206,7 @@ impl CPU {
             //LD A, n8
             0x3E => self.registers.a = self.fetch(),
             0x76 => { /* TODO: HALT*/ }
-            // LD r, r
+            // LD n, n
             0x40..=0x7f => {
                 // opcode: 01_xxx_yyy → xxx = destination, yyy = source
                 let src = match opcode & 0x07 {
@@ -253,7 +253,7 @@ impl CPU {
             //SBC A
             0x9A => self.registers.a = self.sbc(self.registers.d),
             0x9E => self.registers.a = self.sbc(self.memory_bus.read(self.registers.get_hl())),
-            //AND, XOR, OR, CMP
+            //AND, XOR, OR, CMP n
             0xA0..=0xBF => {
                 // opcode: 01_xxx_yyy → xxx = operaction, yyy = source
                 let src = match opcode & 0x07 {
@@ -314,6 +314,85 @@ impl CPU {
                 let address = self.fetch_u16();
                 if self.registers.f.zero {
                     self.registers.pc = address;
+                }
+            }
+            //PREFIX
+            0xCB => {
+                // opcode: 01_xxx_yyy → xxx = operaction, yyy = source
+                let next_opcode = self.fetch();
+
+                let src = match next_opcode & 0x07 {
+                    0 => self.registers.b,
+                    1 => self.registers.c,
+                    2 => self.registers.d,
+                    3 => self.registers.e,
+                    4 => self.registers.h,
+                    5 => self.registers.l,
+                    6 => self.memory_bus.read(self.registers.get_hl()), //memory[HL]
+                    7 => self.registers.a,
+                    _ => panic!("QUE PASO EN MATCH OPCODE AYUDA"),
+                };
+
+                let result: u8;
+                if (0x40..=0x7F).contains(&next_opcode) {
+                    match next_opcode {
+                        0x40..=0x47 => self.bit(src, 0),
+                        0x48..=0x4F => self.bit(src, 1),
+                        0x50..=0x57 => self.bit(src, 2),
+                        0x58..=0x5F => self.bit(src, 3),
+                        0x60..=0x67 => self.bit(src, 4),
+                        0x68..=0x6F => self.bit(src, 5),
+                        0x70..=0x77 => self.bit(src, 6),
+                        0x78..=0x7F => self.bit(src, 7),
+                        _ => panic!("wrong opcode PREFIX"),
+                    }
+                } else {
+                    result = match next_opcode {
+                        0x00..=0x07 => self.rlc(src),
+                        0x08..=0x0F => self.rrc(src),
+                        0x10..=0x17 => self.rl(src),
+                        0x18..=0x1F => self.rr(src),
+                        0x20..=0x27 => self.sla(src),
+                        0x28..=0x2F => self.sra(src),
+                        0x30..=0x37 => self.swap(src),
+                        0x38..=0x3F => self.srl(src),
+                        0x80..=0x87 => self.res(src, 0),
+                        0x88..=0x8F => self.res(src, 1),
+                        0x90..=0x97 => self.res(src, 2),
+                        0x98..=0x9F => self.res(src, 3),
+                        0xA0..=0xA7 => self.res(src, 4),
+                        0xA8..=0xAF => self.res(src, 5),
+                        0xB0..=0xB7 => self.res(src, 6),
+                        0xB8..=0xBF => self.res(src, 7),
+                        0xC0..=0xC7 => self.set(src, 0),
+                        0xC8..=0xCF => self.set(src, 1),
+                        0xD0..=0xD7 => self.set(src, 2),
+                        0xD8..=0xDF => self.set(src, 3),
+                        0xE0..=0xE7 => self.set(src, 4),
+                        0xE8..=0xEF => self.set(src, 5),
+                        0xF0..=0xF7 => self.set(src, 6),
+                        0xF8..=0xFF => self.set(src, 7),
+                        _ => panic!("wrong opcode PREFIX"),
+                    };
+
+                    let target_adress = next_opcode & 0x07;
+
+                    if target_adress == 6 {
+                        self.memory_bus.write(self.registers.get_hl(), result);
+                    } else {
+                        let target = match target_adress {
+                            0 => &mut self.registers.b,
+                            1 => &mut self.registers.c,
+                            2 => &mut self.registers.d,
+                            3 => &mut self.registers.e,
+                            4 => &mut self.registers.h,
+                            5 => &mut self.registers.l,
+                            7 => &mut self.registers.a,
+                            _ => panic!("wrong target adress prefix"),
+                        };
+
+                        *target = result;
+                    }
                 }
             }
             //CALL
@@ -504,6 +583,123 @@ impl CPU {
 
         result2
     }
+
+    fn swap(&mut self, byte: u8) -> u8 {
+        let high_nibble = byte & 0xF0;
+        let low_nibble = byte & 0x0F;
+
+        let result = low_nibble << 4 | high_nibble >> 4;
+
+        self.registers.f.zero = result == 0;
+        self.registers.f.subtract = false;
+        self.registers.f.half_carry = false;
+        self.registers.f.carry = false;
+        result
+    }
+
+    //rotate left circular
+    fn rlc(&mut self, byte: u8) -> u8 {
+        let rotated = (byte << 1) | (byte >> 7);
+
+        self.registers.f.zero = rotated == 0;
+        self.registers.f.subtract = false;
+        self.registers.f.half_carry = false;
+        self.registers.f.carry = byte & 0x80 != 0;
+
+        rotated
+    }
+
+    //rotate right circular
+    fn rrc(&mut self, byte: u8) -> u8 {
+        let rotated = (byte << 7) | (byte >> 1);
+
+        self.registers.f.zero = rotated == 0;
+        self.registers.f.subtract = false;
+        self.registers.f.half_carry = false;
+        self.registers.f.carry = byte & 0x01 != 0;
+
+        rotated
+    }
+
+    //rotate left through carry
+    fn rl(&mut self, byte: u8) -> u8 {
+        let rotated = (byte << 1) | self.registers.f.carry as u8;
+
+        self.registers.f.zero = rotated == 0;
+        self.registers.f.subtract = false;
+        self.registers.f.half_carry = false;
+        self.registers.f.carry = byte & 0x80 != 0;
+
+        rotated
+    }
+
+    //rotate right through carry
+    fn rr(&mut self, byte: u8) -> u8 {
+        let rotated = ((self.registers.f.carry as u8) << 7) | (byte >> 1);
+
+        self.registers.f.zero = rotated == 0;
+        self.registers.f.subtract = false;
+        self.registers.f.half_carry = false;
+        self.registers.f.carry = byte & 0x01 != 0;
+
+        rotated
+    }
+
+    //arithmetic left shift
+    fn sla(&mut self, byte: u8) -> u8 {
+        let shifted = byte << 1;
+
+        self.registers.f.zero = shifted == 0;
+        self.registers.f.subtract = false;
+        self.registers.f.half_carry = false;
+        self.registers.f.carry = byte & 0x80 != 0;
+
+        shifted
+    }
+
+    //arithmetic right shift
+    fn sra(&mut self, byte: u8) -> u8 {
+        let shifted = byte & 0x80 | byte >> 1;
+
+        self.registers.f.zero = shifted == 0;
+        self.registers.f.subtract = false;
+        self.registers.f.half_carry = false;
+        self.registers.f.carry = byte & 0x80 != 0;
+
+        shifted
+    }
+
+    //logic right shift
+    fn srl(&mut self, byte: u8) -> u8 {
+        let shifted = byte >> 1;
+
+        self.registers.f.zero = shifted == 0;
+        self.registers.f.subtract = false;
+        self.registers.f.half_carry = false;
+        self.registers.f.carry = byte & 0x01 != 0;
+
+        shifted
+    }
+
+    // BIT b, r
+    // test bit b in register r
+    fn bit(&mut self, r: u8, bit: u8) {
+        let result: bool = r & (1 << bit) == 0;
+
+        self.registers.f.zero = result;
+        self.registers.f.subtract = false;
+        self.registers.f.half_carry = true;
+    }
+
+    fn set(&mut self, byte: u8, bit: u8) -> u8 {
+        byte | (1 << bit)
+    }
+
+    fn res(&mut self, byte: u8, bit: u8) -> u8 {
+        byte & !(1 << bit)
+    }
+
+    //STACK
 
     fn stack_push(&mut self, value: u16) {
         let high_byte = (value >> 8) as u8;
