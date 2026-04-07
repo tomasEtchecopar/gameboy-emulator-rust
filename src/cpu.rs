@@ -283,6 +283,11 @@ impl CPU {
 
                 self.registers.a = result;
             }
+            //POP BC
+            0xC1 => {
+                let address = self.stack_pop();
+                self.registers.set_bc(address);
+            }
             //JP NZ, n16
             0xC2 => {
                 let address = self.fetch_u16();
@@ -295,10 +300,18 @@ impl CPU {
                 let address = self.fetch_u16();
                 self.registers.pc = address;
             }
-            //POP BC
-            0xC1 => {
-                let address = self.stack_pop();
-                self.registers.set_bc(address);
+
+            //CALL NZ, nn
+            0xC4 => {
+                //operand
+                let address = self.fetch_u16();
+                if self.registers.f.zero == false {
+                    //saving return adress to stack
+                    self.stack_push(self.registers.pc);
+
+                    //jump to operand
+                    self.registers.pc = address;
+                }
             }
             //PUSH BC
             0xC5 => {
@@ -395,6 +408,15 @@ impl CPU {
                     }
                 }
             }
+            //CALL Z, nn
+            0xCC => {
+                let address = self.fetch_u16();
+
+                if self.registers.f.zero {
+                    self.stack_push(self.registers.pc);
+                    self.registers.pc = address;
+                }
+            }
             //CALL
             0xCD => {
                 //operand
@@ -418,14 +440,34 @@ impl CPU {
                     self.registers.pc = address;
                 }
             }
+            //CALL NC, nn
+            0xD4 => {
+                let address = self.fetch_u16();
+
+                if !self.registers.f.carry {
+                    self.stack_push(self.registers.pc);
+                    self.registers.pc = address;
+                }
+            }
             //PUSH DE
             0xD5 => {
                 self.stack_push(self.registers.get_de());
             }
+            //RETI
+            0xD9 => { /* TODO: RETI*/ }
             //JP C, n16
             0xDA => {
                 let address = self.fetch_u16();
                 if self.registers.f.carry {
+                    self.registers.pc = address;
+                }
+            }
+            //CALL C , nn
+            0xDC => {
+                let address = self.fetch_u16();
+
+                if self.registers.f.carry {
+                    self.stack_push(self.registers.pc);
                     self.registers.pc = address;
                 }
             }
