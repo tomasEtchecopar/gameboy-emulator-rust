@@ -1,0 +1,1 @@
+C:\Users\usuario\dev\gameboy-emulator\target\debug\gameboy-emulator.exe: C:\Users\usuario\dev\gameboy-emulator\src\cpu.rs C:\Users\usuario\dev\gameboy-emulator\src\main.rs C:\Users\usuario\dev\gameboy-emulator\src\memory.rs

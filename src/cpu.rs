@@ -38,6 +38,11 @@ impl CPU {
                 let value = self.fetch_u16();
                 self.registers.set_bc(value);
             }
+            //LD (BC), A
+            0x02 => {
+                self.memory_bus
+                    .write(self.registers.get_bc(), self.registers.a);
+            }
             //INC BC
             0x03 => {
                 let value = self.inc_u16(self.registers.get_bc());
@@ -66,6 +71,11 @@ impl CPU {
                 let value = self.fetch_u16();
                 self.registers.set_de(value);
             }
+            //LD (DE), A
+            0x12 => {
+                self.memory_bus
+                    .write(self.registers.get_de(), self.registers.a);
+            }
             //INC DE
             0x13 => {
                 let value = self.inc_u16(self.registers.get_de());
@@ -83,6 +93,8 @@ impl CPU {
                 let offset = self.fetch() as i16;
                 self.registers.pc = self.registers.pc.wrapping_add_signed(offset as i16);
             }
+            //LD A, (DE)
+            0x1A => self.registers.a = self.memory_bus.read(self.registers.get_de()),
             //DEC DE
             0x1B => {
                 let value = self.dec_u16(self.registers.get_de());
@@ -106,6 +118,13 @@ impl CPU {
             0x21 => {
                 let value = self.fetch_u16();
                 self.registers.set_hl(value);
+            }
+            //LD (HL+), A
+            0x22 => {
+                self.memory_bus
+                    .write(self.registers.get_hl(), self.registers.a);
+                self.registers
+                    .set_hl(self.registers.get_hl().wrapping_add(1));
             }
             //INC HL
             0x23 => {
@@ -205,7 +224,6 @@ impl CPU {
             0x3D => self.registers.a = self.dec(self.registers.a),
             //LD A, n8
             0x3E => self.registers.a = self.fetch(),
-            0x76 => { /* TODO: HALT*/ }
             // LD n, n
             0x40..=0x7f => {
                 // opcode: 01_xxx_yyy → xxx = destination, yyy = source
@@ -241,6 +259,7 @@ impl CPU {
                     *target = src;
                 }
             }
+            0x76 => { /* TODO: HALT*/ }
             // ADD A
             0x80 => self.add_to_a(self.registers.b),
             0x81 => self.add_to_a(self.registers.c),
@@ -316,6 +335,11 @@ impl CPU {
             //PUSH BC
             0xC5 => {
                 self.stack_push(self.registers.get_bc());
+            }
+            //ADD A, n8
+            0xc6 => {
+                let value = self.fetch();
+                self.add_to_a(value);
             }
             //RET
             0xC9 => {
@@ -453,6 +477,11 @@ impl CPU {
             0xD5 => {
                 self.stack_push(self.registers.get_de());
             }
+            //SUB A, n8
+            0xD6 => {
+                let value = self.fetch();
+                self.sub_to_a(value);
+            }
             //RETI
             0xD9 => { /* TODO: RETI*/ }
             //JP C, n16
@@ -482,6 +511,11 @@ impl CPU {
                 let address = self.stack_pop();
                 self.registers.set_hl(address);
             }
+            // LD ($FF00+C), A
+            0xE2 => {
+                self.memory_bus
+                    .write(0xFF00 + self.registers.c as u16, self.registers.a);
+            }
             //PUSH HL
             0xE5 => {
                 self.stack_push(self.registers.get_hl());
@@ -506,6 +540,8 @@ impl CPU {
                 let address = self.stack_pop();
                 self.registers.set_af(address);
             }
+            //LD A, ($FF00 + C)
+            0xF2 => self.registers.a = self.memory_bus.read(0xFF00 + self.registers.c as u16),
             0xF3 => { /* TODO: Disable interrupts */ }
             //PUSH AF
             0xF5 => {
@@ -531,12 +567,24 @@ impl CPU {
     }
 
     fn add_to_a(&mut self, value: u8) {
-        let (result_a, hubo_carry) = self.registers.a.overflowing_add(value);
+        let (result_a, carry) = self.registers.a.overflowing_add(value);
 
         //flags
         self.registers.f.zero = result_a == 0;
         self.registers.f.subtract = false;
-        self.registers.f.carry = hubo_carry;
+        self.registers.f.carry = carry;
+        self.registers.f.half_carry = (self.registers.a & 0x0F) < (value & 0x0F);
+
+        //a register
+        self.registers.a = result_a;
+    }
+
+    fn sub_to_a(&mut self, value: u8) {
+        let (result_a, carry) = self.registers.a.overflowing_sub(value);
+        //flags
+        self.registers.f.zero = result_a == 0;
+        self.registers.f.subtract = true;
+        self.registers.f.carry = carry;
         self.registers.f.half_carry = (self.registers.a & 0x0F) + (value & 0x0F) > 0x0F;
 
         //a register
